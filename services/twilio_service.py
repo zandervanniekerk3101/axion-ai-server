@@ -17,8 +17,9 @@ def make_phone_call(to_number, message):
         return "Twilio credentials are not configured on the server."
 
     try:
-        # Create a simple TwiML instruction to say the message
-        twiml_instruction = f'<Response><Say>{message}</Say></Response>'
+        # --- THIS IS THE UPGRADED PART ---
+        # We now specify a premium, more human-like voice (Polly.Joanna).
+        twiml_instruction = f'<Response><Say voice="Polly.Joanna">{message}</Say></Response>'
 
         call = client.calls.create(
             twiml=twiml_instruction,
