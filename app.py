@@ -1,12 +1,16 @@
 # app.py
-# This is the updated code for your Axiom AI server with AI capabilities.
+# This is the complete code for your Axiom AI server with both AI and Twilio capabilities.
 
 import os
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import openai
 
-# Load the environment variables (like your API key) from the .env file
+# --- NEW IMPORT ---
+# Import the function we created to handle making phone calls
+from services.twilio_service import make_phone_call
+
+# Load the environment variables (like your API keys) from the .env file
 load_dotenv()
 
 # Set up the OpenAI API key
@@ -20,22 +24,16 @@ app = Flask(__name__)
 def home():
     return "Axiom AI Server is online!"
 
-# This is the NEW route that will handle AI requests from your future Android app.
-# It only accepts POST requests, which is a standard way to send data to a server.
+# This is the route that handles AI requests from your Android app.
 @app.route('/ask', methods=['POST'])
 def ask_axiom():
-    # Get the data sent from the app. We expect it to be in JSON format.
     data = request.get_json()
-
-    # Basic error checking to make sure we received a 'prompt'.
     if not data or 'prompt' not in data:
         return jsonify({"error": "Invalid request. A 'prompt' is required."}), 400
 
-    # Extract the user's question/prompt from the JSON data.
     user_prompt = data['prompt']
 
     try:
-        # Send the prompt to the OpenAI API (using the gpt-4o-mini model).
         completion = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -43,16 +41,32 @@ def ask_axiom():
                 {"role": "user", "content": user_prompt}
             ]
         )
-        # Extract the AI's response text.
         ai_response = completion.choices[0].message.content
-        
-        # Send the AI's response back in JSON format.
         return jsonify({"response": ai_response})
 
     except Exception as e:
-        # If something goes wrong with the OpenAI API call, send back an error.
         print(f"Error communicating with OpenAI: {e}")
         return jsonify({"error": "Sorry, I'm having trouble connecting to my brain right now."}), 500
+
+# --- NEW ENDPOINT FOR MAKING CALLS ---
+@app.route('/make_call', methods=['POST'])
+def handle_make_call():
+    """
+    This endpoint receives a phone number and a message from the app
+    and uses Twilio to make the call.
+    """
+    data = request.json
+    if not data or 'to_number' not in data or 'message' not in data:
+        return jsonify({"error": "Invalid request. 'to_number' and 'message' are required."}), 400
+
+    to_number = data['to_number']
+    message = data['message']
+
+    # Call our function from the twilio_service
+    result = make_phone_call(to_number, message)
+
+    return jsonify({"status": result})
+
 
 # This block runs the server.
 if __name__ == '__main__':
