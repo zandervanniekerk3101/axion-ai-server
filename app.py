@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 import openai
 from services.twilio_service import make_phone_call
 from twilio.twiml.voice_response import VoiceResponse
+import logging # NEW import for logging
+
+# --- NEW: Set up proper logging ---
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -31,7 +35,7 @@ def ask_axiom():
         ai_response = completion.choices[0].message.content
         return jsonify({"response": ai_response})
     except Exception as e:
-        print(f"Error communicating with OpenAI: {e}")
+        app.logger.error(f"Error communicating with OpenAI: {e}") # Use logger
         return jsonify({"error": "Sorry, I'm having trouble connecting to my brain right now."}), 500
 
 @app.route('/make_call', methods=['POST'])
@@ -48,22 +52,22 @@ def handle_make_call():
 @app.route('/incoming_call', methods=['POST'])
 def handle_incoming_call():
     """
-    This endpoint is called by Twilio when someone calls your number.
-    It now has error handling.
+    This endpoint now uses the logging module to guarantee we see the error.
     """
     try:
         response = VoiceResponse()
         response.say('Hello, you have reached Axiom AI. Please leave a message after the beep.', voice='Polly.Joanna')
         response.record(action='/handle_recording', method='POST', maxLength=20, finishOnKey='*')
         response.hangup()
-        # Return the TwiML response with the correct XML content type
         return Response(str(response), mimetype='text/xml')
     except Exception as e:
-        # If any part of the TwiML generation fails, log the error.
-        print(f"!!! INCOMING CALL ERROR: {str(e)}")
+        # --- THIS IS THE CRITICAL CHANGE ---
+        # Instead of print(), we use app.logger.error() to log the full traceback.
+        app.logger.error("!!! INCOMING CALL FAILED !!!", exc_info=True)
+        
         # Respond with a generic error message for Twilio
         response = VoiceResponse()
-        response.say("I'm sorry, an application error has occurred.", voice='Polly.Joanna')
+        response.say("I'm sorry, an application error has occurred. Goodbye.", voice='Polly.Joanna')
         return Response(str(response), mimetype='text/xml')
 
 if __name__ == '__main__':
